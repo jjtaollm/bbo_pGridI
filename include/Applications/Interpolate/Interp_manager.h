@@ -9,13 +9,13 @@ namespace iono
     public:
         Interp_manager();
         ~Interp_manager();
-        void _interp(int mjd, double sod, bool b_useresidual, map<string, map<int, StecC>> &data, map<string, map<int, StecC>> &real);
+        void _interp(int mjd, double sod, map<string, map<int, StecC>> &data, map<string, map<int, StecC>> &real);
         inline void _set_surface_coefficient(map<string, polyCoefficient> &in) { m_coef = in; }
 
         void _alterConf(map<string, string> payload);
 
         map<string, pair<double, double>> _get_gridv(int mjd, double sod, int *refsat, map<int, t_Sunit> &sat2v, Station &grid);
-        void _set_requests(vector<Station> &in);
+        void _set_requests(const vector<Station> &in);
         void _setOutputUrl(string url) { m_url_send = url; }
         void _setOutputModuleId(string id) { m_moduleid = id; }
 

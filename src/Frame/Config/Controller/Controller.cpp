@@ -42,9 +42,9 @@ void Controller::m_makeUpReaders()
     {
         for (auto &kv : mDly.mPostReqs)
         {
-            UDAtomReader *reader = new SlantReader_post(kv.name);
+            UDAtomReader *reader = new SlantReader_post(kv.first);
             reader->m_setAdapter(&mionAdapter);
-            mionReaders[kv.name] = reader;
+            mionReaders[kv.first] = reader;
         }
     }
 }
@@ -60,22 +60,20 @@ void Controller::m_makeUpdFilter()
     {
         mInterp = new Interp_manager();
         if (mDly.lpost)
-            mInterp->_set_requests(mDly.mPostReqs);
+        {
+            vector<Station> reqs;
+            reqs.reserve(mDly.mPostReqs.size());
+            for (const auto &[_, station] : mDly.mPostReqs)
+                reqs.push_back(station);
+            mInterp->_set_requests(reqs);
+        }
     }
 }
 
 void Controller::m_initializeProcess(bool bPost)
 {
-    if (!bPost)
-    {
-        mDly.m_assign_default(m_argc, m_args);
-        mManger.s_openUrl(mDly.iono_url);
-    }
-    else
-    {
-        mDly.m_readJsonFile(m_argc, m_args);
-        m_makeUpReaders();
-    }
+    mDly.m_readJsonFile(m_argc, m_args);
+    m_makeUpReaders();
     m_makeUpdFilter();
 }
 
@@ -151,11 +149,11 @@ void Controller::m_runInterpolation(EpochData &epoch, SurfaceResult &surface)
     if (surface.hasModel())
     {
         mInterp->_set_surface_coefficient(surface.coefficients);
-        mInterp->_interp(mDly.mjd, mDly.sod, mDly.mlon0, surface.residuals, epoch.all);
+        mInterp->_interp(mDly.mjd, mDly.sod, surface.residuals, epoch.all);
     }
     else
     {
-        mInterp->_interp(mDly.mjd, mDly.sod, mDly.mlon0, epoch.model, epoch.all);
+        mInterp->_interp(mDly.mjd, mDly.sod, epoch.model, epoch.all);
     }
     Log::s_tmeConsume("INTERP");
 }

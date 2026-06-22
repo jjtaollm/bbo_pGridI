@@ -20,6 +20,7 @@ namespace iono
             R = 0.0;
             memset(name, 0, sizeof(name));
             memset(x, 0, sizeof(x));
+            ipp_lat = ipp_lon = 0.0;
             memset(gausx, 0, sizeof(gausx));
         };
         int isat;        /* current satellite */
@@ -29,6 +30,8 @@ namespace iono
         double ionvm;    /* current model value */
         double elev;     /* current elevation,in degrees */
         double azim;     /* current azim, in degrees */
+        double ipp_lat;  /* current ipp_lat, in degrees*/
+        double ipp_lon;  /* current ipp_lon, in degrees*/
         double x[3];     /* current coordinates in plane, in kilometers */
         double gausx[3]; /* current coordinates in plane, in kilometers */
         double R;        /* weight of observation*/

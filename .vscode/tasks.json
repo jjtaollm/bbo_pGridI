@@ -1,0 +1,27 @@
+{
+    // See https://go.microsoft.com/fwlink/?LinkId=733558
+    // for the documentation about the tasks.json format
+    "version": "2.0.0",
+    "tasks": [
+        {
+            "label": "debug bamboo",
+            "type": "shell",
+            "command": " mkdir build-debug; cd build-debug; cmake ../ -DCMAKE_BUILD_TYPE=Debug;cmake --build ./ --target all -- -j 6; mv bamboo ../"
+        },
+        {
+            "label": "release bamboo",
+            "type": "shell",
+            "command": " mkdir build-release; cd build-release; cmake ../ -DCMAKE_BUILD_TYPE=Release;cmake --build ./  --target all -- -j 6; mv bamboo ../"
+        },
+        {
+            "label": "build library",
+            "type": "shell",
+            "command": "mkdir build-library; cd build-library; cp ../static/CMakeLists.txt ./; cmake ./ -DCMAKE_BUILD_TYPE=Release;cmake --build ./  --target all -- -j 6;"
+        },
+        {
+            "label": "release bamboo and update github",
+            "type": "shell",
+            "command": "git add .;git commit -m 'update ISB/ICB/DCB'; git push origin master;mkdir build-release; cd build-release; cmake ../ -DCMAKE_BUILD_TYPE=Release;cmake --build ./  --target all -- -j 6; mv bamboo ../;"
+        }
+    ]
+}

@@ -153,9 +153,7 @@ namespace iono
         DCBReader reader;
         map<string, polyCoefficient> m_coef;
         map<time_t, map<string, t_key2v>> m_data;
-        // Encode_iono encode_ion;
         char m_csys;
-
         string m_tag_res_fil;
         string m_tag_coef_fil;
     };

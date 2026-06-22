@@ -114,7 +114,7 @@ void Interp_kriging_smp::_process(time_t t, int *refsat, vector<string> &snames,
     for (int i = 0; i < snames.size(); ++i)
         sindex[i] = i;
     /* interpolate for CV */
-    // _interp_r_all(t, refsat, snames, sates, data_sd);
+    _interp_r_all(t, refsat, snames, sates, data_sd);
     /* interpolate for each grid */
     {
         /* using thread to interpolate for each grid */
@@ -325,7 +325,7 @@ t_VariogramM Interp_kriging_smp::_kriging_est_hyperpam_spherical(vector<t_SampPt
 static void _form_obs(vector<t_SampPt> &pts, t_VariogramM &m, int idel, double *A, int lda)
 {
     vector<t_SampPt *> p_ptr;
-    memset(A, 0, sizeof(lda * lda));
+    memset(A, 0, sizeof(double) * lda * lda);
     for (int i = 0; i < pts.size(); ++i)
     {
         if (i == idel)

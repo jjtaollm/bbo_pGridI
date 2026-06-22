@@ -1,0 +1,170 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "rtclk",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/bamboo",
+            "args": [
+                "-mode",
+                "clk",
+                "clk.json",
+                "-itrs",
+                "-post",
+                "-dia",
+                "-iar"
+            ],
+            "stopAtEntry": false,
+            "cwd": "/home/jtao/company/dev/UdProject/Dataset/Configures/Raw_clk/workconf/workconf_X",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "miDebuggerPath": "/usr/bin/gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-interpreter-exec console \"python import sys; sys.path.insert(0, '/usr/share/gcc/python'); from libstdcxx.v6.printers import register_libstdcxx_printers; register_libstdcxx_printers(None)\"",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Print object dynamic type",
+                    "text": "-interpreter-exec console \"set print object on\"",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Print array elements",
+                    "text": "-interpreter-exec console \"set print elements 0\"",
+                    "ignoreFailures": true
+                }
+            ],
+            "preLaunchTask": "release bamboo"
+        },
+        {
+            "name": "rt_monitor",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/bamboo",
+            "args": [
+                "-mode",
+                "monitor",
+                "clk.json",
+                "-itrs",
+                "-dia",
+                "-minput",
+                "moni_C.cfg",
+                "-post",
+                "-pams",
+                "-outres"
+            ],
+            "stopAtEntry": false,
+            "cwd": "/home/jtao//p_work/papers/IURE_rt_simu/workconf_test/Residual_corr",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "miDebuggerPath": "/usr/bin/gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-interpreter-exec console \"python import sys; sys.path.insert(0, '/usr/share/gcc/python'); from libstdcxx.v6.printers import register_libstdcxx_printers; register_libstdcxx_printers(None)\"",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Print object dynamic type",
+                    "text": "-interpreter-exec console \"set print object on\"",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Print array elements",
+                    "text": "-interpreter-exec console \"set print elements 0\"",
+                    "ignoreFailures": true
+                }
+            ],
+            "preLaunchTask": "release bamboo"
+        },
+        {
+            "name": "rtppp",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/bamboo",
+            "args": [
+                "-mode",
+                "clk",
+                "clk.json",
+                "-itrs",
+                "-dia",
+                "-post",
+                "-pams",
+                "-a1test",
+                "G04,0,0",
+                "-outres"
+            ],
+            "stopAtEntry": false,
+            "cwd": "/home/jtao/company/dev/UDSER_dev/bamboo_sbas/Configures_sbas/workconf_clk/",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "python import sys;sys.path.insert(0, '/usr/bin/python');from libstdcxx.v6.printers import register_libstdcxx_printers;register_libstdcxx_printers(None)",
+                    "ignoreFailures": false
+                }
+            ],
+            "preLaunchTask": "release bamboo"
+        },
+        {
+            "name": "rtppp_center",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/bamboo",
+            "args": [
+                "-mode",
+                "pppv",
+                "clk.json",
+                "-itrs",
+                "-iar",
+                "-dia",
+                "-pthread",
+                "-url",
+                "58.49.94.131:18332/ppprtk_0"
+            ],
+            "stopAtEntry": false,
+            "cwd": "/home/jtao/company/dev/UDSER_dev/bamboo_sbas/Configures/workconf/workconf_ppp_rt",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "python import sys;sys.path.insert(0, '/usr/bin/python');from libstdcxx.v6.printers import register_libstdcxx_printers;register_libstdcxx_printers(None)",
+                    "ignoreFailures": false
+                }
+            ],
+            "preLaunchTask": "debug bamboo"
+        }
+    ]
+}

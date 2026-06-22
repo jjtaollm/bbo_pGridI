@@ -1,11 +1,6 @@
-#include "include/Applications/SurfaceModel_sd/polyModel_sd.h"
 #include "include/Applications/SurfaceModel/polyModel.h"
 #include "include/Applications/Interpolate/Interp_kriging_smp.h"
 #include "include/Applications/Interpolate/Interp_manager.h"
-#include "include/Applications/Encoder/SurfEncoder.h"
-#include "include/Applications/Encoder/GridEncoder.h"
-// /* debug begin */
-#include "include/Applications/Encoder/AtomDecoder.h"
 // /* debug end */
 namespace iono
 {

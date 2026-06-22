@@ -3,13 +3,13 @@ project(iono)
 
 
 
-set(MKLROOT "/home/jtao//thrdparty/mkl")
-set(MKLLIB "/home/jtao//thrdparty/mkl/lib")
+set(MKLROOT "/home/jtao//thirdparty/mkl")
+set(MKLLIB "/home/jtao//thirdparty/mkl/lib")
 set(MYSQL_DIR "/usr/lib64/mysql")
-set(REDIS_DIR "/home/jtao//thrdparty/hiredis")
-set(GSL_DIR "/home/jtao//thrdparty/gsl/")
-set(MQTT_DIR "/home/jtao//thrdparty/mqtt/src")
-set(EIGEN_DIR "/home/jtao//thrdparty/eigen3")
+set(REDIS_DIR "/home/jtao//thirdparty/hiredis")
+set(GSL_DIR "/home/jtao//thirdparty/gsl/")
+set(MQTT_DIR "/home/jtao//thirdparty/mqtt/src")
+set(EIGEN_DIR "/home/jtao//thirdparty/eigen3")
 
 # ######################## configures here to different types of executable ##########################
 set(USE_PARALLEL_MKL OFF)
@@ -43,11 +43,12 @@ FILE(GLOB SOURCE_FRAME_CONNECTION_BOOTLOADER ${PROJECT_SOURCE_DIR}/src/Frame/Con
 
 FILE(GLOB SOURCE_GNSS_IONO ${PROJECT_SOURCE_DIR}/src/Frame/Gnss/GnssInput/Atomsphere/*.cpp)
 FILE(GLOB SOURCE_GNSS_IONO_READER ${PROJECT_SOURCE_DIR}/src/Frame/Gnss/GnssInput/Atomsphere/Reader/*.cpp)
+FILE(GLOB SOURCE_GNSS_DCB_READER ${PROJECT_SOURCE_DIR}/src/Frame/Gnss/GnssInput/DCB/*.cpp)
 FILE(GLOB SOURCE_GNSS_OBS ${PROJECT_SOURCE_DIR}/src/Frame/Gnss/GnssInput/GnssObs/*.cpp)
 FILE(GLOB SOURCE_GNSS_ORBCLK_ADAPTER ${PROJECT_SOURCE_DIR}/src/Frame/Gnss/GnssInput/Orbclk/Adapter/*.cpp)
 FILE(GLOB SOURCE_GNSS_ORBCLK_READER ${PROJECT_SOURCE_DIR}/src/Frame/Gnss/GnssInput/Orbclk/Reader/*.cpp)
 
-set(SOURCE_FRAME ${SOURCE_CONFIG_BAMBOO} ${SOURCE_CONFIG_UTILS_COM}  ${SOURCE_CONFIG_UTILS_JSON} 
+set(SOURCE_FRAME ${SOURCE_CONFIG_BAMBOO} ${SOURCE_GNSS_DCB_READER} ${SOURCE_CONFIG_UTILS_COM}  ${SOURCE_CONFIG_UTILS_JSON} 
 ${SOURCE_CONNECTION_INNERLINK} ${SOURCE_CONNECTION_NET} ${SOURCE_GNSS_IONO} ${SOURCE_GNSS_IONO_READER}
 ${SOURCE_FRAME_CONNECTION_BOOTLOADER} ${SOURCE_GNSS_OBS} ${SOURCE_GNSS_ORBCLK_ADAPTER}
  ${SOURCE_GNSS_ORBCLK_READER})

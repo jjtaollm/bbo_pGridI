@@ -5,8 +5,6 @@
 #include "include/Frame/Config/Controller/Satellite.h"
 
 /// connection
-
-#include "include/Frame/Connection/Bootloader/PManager.h"
 #include "include/Frame/Connection/InnerLink/Callable.h"
 #include "include/Frame/Connection/InnerLink/CallBackCenter.h"
 #include "include/Frame/Connection/InnerLink/KvContainer.h"
@@ -35,3 +33,6 @@
 #include "include/Frame/Gnss/GnssInput/Orbclk/Adapter/BrdOrbitClkAdapter.h"
 #include "include/Frame/Gnss/GnssInput/Orbclk/Adapter/BroadcastEphUtils.h"
 #include "include/Frame/Gnss/GnssInput/Orbclk/Reader/RnxEphBrdReader.h"
+
+#include "include/Frame/Gnss/GnssInput/DCB/DCBAdapter.h"
+#include "include/Frame/Gnss/GnssInput/DCB/DCBReader.h"

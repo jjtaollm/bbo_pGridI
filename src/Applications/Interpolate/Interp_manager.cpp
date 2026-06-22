@@ -88,7 +88,7 @@ Interp_manager::Interp_manager() : Callable(this)
 Interp_manager::~Interp_manager()
 {
 }
-void Interp_manager::_set_requests(vector<Station> &in)
+void Interp_manager::_set_requests(const vector<Station> &in)
 {
     function chk_diff = [](list<string> s1, list<string> s2) -> list<string> /* items in s1 that not in s2 */
     {
@@ -161,10 +161,10 @@ void Interp_manager::_kriging_update_xy(map<string, vector<double>> &s2coor, dou
     }
     bl2Gaussxy(sta.geod[0], sta.geod[1], sta.gausx, sta.gausx + 1, lon0 * D2R, ESQUARE, EARTH_A, 0.0);
 }
-void Interp_manager::_interp(int mjd, double sod, bool buse_residual, map<string, map<int, StecC>> &input, map<string, map<int, StecC>> &realv)
+void Interp_manager::_interp(int mjd, double sod, map<string, map<int, StecC>> &input, map<string, map<int, StecC>> &realv)
 {
     map<string, t_gridV> s2grid;
-    map<string, vector<double>> s2cor = s_getStationC(data);
+    map<string, vector<double>> s2cor = s_getStationC(realv);
     vector<int> ref;
     for (auto &req : mReqs)
     {
