@@ -14,26 +14,32 @@ namespace iono
     public:
         polyCoefficient()
         {
-            irf = -1;
+            isat = -1;
             t0 = 0;
             lon0 = lat0 = 0.0;
+            fit_rms = 0.0;
             esig = 0.0;
-            esig_cv = 0.0;
-            sig0 = 1.0;
+            fit_rms_all = 0.0;
+            esig_all = 0.0;
             n = m = 0;
             nobs = 0;
+            ndof = 0;
+            nobs_all = 0;
+            ndof_all = 0;
         }
         time_t t0;
         double lon0;
         double lat0;
         double esig;
-        double esig_cv;
-        double sig0;
-        double sig0_cv;
+        double esig_all;
+        double fit_rms;
+        double fit_rms_all;
         int n;
         int m;
         int nobs;
-        int irf;
+        int ndof;
+        int nobs_all;
+        int ndof_all;
         int isat;
         vector<double> coef;
         /// @brief return model value
@@ -93,8 +99,8 @@ namespace iono
         virtual void v_run(int mjd, double sod, map<string, t_key2v> &data);
         /* to update residuals */
         map<string, map<int, StecC>> _get_residual(time_t time, map<string, polyCoefficient> &coef, map<string, map<int, StecC>> &data);
-        /* to get esigma of these residuals */
-        void _assign_esigma(map<string, map<int, StecC>> &res, map<string, polyCoefficient> &coef);
+        /* calculate per-satellite and whole-model residual statistics */
+        void _assign_fit_statistics(map<string, polyCoefficient> &coef);
         /* get coefficient */
         inline map<string, polyCoefficient> m_getCoef() { return m_coef; }
         /* set span */
@@ -111,7 +117,8 @@ namespace iono
     public:
         /* estimated functions */
         vector<double> _update_coeff(double dif_lat, double dif_lon, StecC &s, bool bunify);
-        void _init_DCB_pam(double *A, int lda);
+        void _init_DCB_pam();
+        void _add_DCB_prior(double *AtA, int lda);
         void _estimated(map<time_t, map<string, map<int, StecC>>> &data, int nobs, int *sat2no);
         int _residual_check(map<time_t, map<string, t_key2v>> &, double *r, int (*nb2idx)[4], int nb);
         int _form_A_matrix(map<time_t, map<string, t_key2v>> &data, double *A, int ldaA, double *L, int *sat2o, int (*nb2idx)[4], bool bunify = true);
@@ -134,7 +141,6 @@ namespace iono
         double mlat0;
         double mlon0;
         double mesig;
-        double msat2sig[MAXSAT];
         int mN = 2;
         int mM = 2;
         int mjdsync = -1;

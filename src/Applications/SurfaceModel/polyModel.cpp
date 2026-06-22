@@ -116,12 +116,16 @@ void polyModel::v_run(int mjd, double sod, map<string, map<int, StecC>> &data)
 
 int polyModel::m_form_norm_and_solve(int nb, double *A, int lda, double *L, int ldaL, double *AtA, int ldAtA)
 {
+    if (nb == 0)
+        return 0;
     /* form the norm matrix */
     int npms = this->m_Pm.size(), bok = 1;
     Deploy *dly = Controller::s_getInstance()->m_getConfigure();
     double *AtL = (double *)calloc(npms, sizeof(double));
     CMat::CMat_Matmul("TN", npms, npms, nb, 1.0, A, lda, A, lda, 0.0, AtA, ldAtA); /* form normal matrix */
     CMat::CMat_Matmul("TN", npms, 1, nb, 1.0, A, lda, L, lda, 0.0, AtL, npms);     /* update AtL */
+    /* DCB corrections are estimated around xini, so their prior mean is zero. */
+    _add_DCB_prior(AtA, ldAtA);
     for (size_t ip = 0; ip < m_Pm.size(); ip++)
         if (m_Pm[ip].iobs == 0)
             AtA[ip * npms + ip] = AtA[ip * npms + ip] + 1e5; /* add zero contraint */
@@ -161,62 +165,82 @@ bool polyModel::_b_gotDCBCorrection(string sname, char csys)
     else
         return false;
 }
-void polyModel::_init_DCB_pam(double *AtA, int lda)
+void polyModel::_init_DCB_pam()
 {
-    double stec_sig = 10.0;
     Deploy *dly = Controller::s_getInstance()->m_getConfigure();
-    int npms = this->m_Pm.size();
     map<string, map<char, double>> &dcbv = dcbAdapter.s2dcb;
-    map<string, map<char, double>> &dcbv_sig = dcbAdapter.s2dcb_sig;
-    for (int i = 0; i < npms; ++i)
+    for (auto &pm : m_Pm)
     {
-        if (m_Pm[i].tp == 2)
+        if (pm.tp == 2 && _b_gotDCBCorrection(pm.sname, pm.csys))
         {
-            polypm &pm = m_Pm[i];
-            if (_b_gotDCBCorrection(pm.sname, pm.csys))
-            {
-                int isys = index_string(SYS, pm.csys);
-                double fq = freqbysys(isys, -1, dly->freq[isys][0]);
-                double stec = dcbv[pm.sname][SYS[isys]] / 1e9 * VEL_LIGHT * fq * fq / 40.28 / 1e16;
-                pm.xini = stec;                               /* update initial value */
-                AtA[i * lda + i] = 1.0 / stec_sig / stec_sig; /* update the priori P */
-            }
+            int isys = index_string(SYS, pm.csys);
+            double fq = freqbysys(isys, -1, dly->freq[isys][0]);
+            pm.xini = dcbv[pm.sname][pm.csys] / 1e9 * VEL_LIGHT * fq * fq / 40.28 / 1e16;
         }
     }
 }
+
+void polyModel::_add_DCB_prior(double *AtA, int lda)
+{
+    const double fallbackStecSigma = 10.0;
+    Deploy *dly = Controller::s_getInstance()->m_getConfigure();
+    map<string, map<char, double>> &dcbv_sig = dcbAdapter.s2dcb_sig;
+    for (size_t i = 0; i < m_Pm.size(); ++i)
+    {
+        polypm &pm = m_Pm[i];
+        if (pm.tp != 2 || !_b_gotDCBCorrection(pm.sname, pm.csys))
+            continue;
+
+        double stecSigma = fallbackStecSigma;
+        auto station = dcbv_sig.find(pm.sname);
+        if (station != dcbv_sig.end())
+        {
+            auto system = station->second.find(pm.csys);
+            if (system != station->second.end() && system->second > 0.0)
+            {
+                int isys = index_string(SYS, pm.csys);
+                double fq = freqbysys(isys, -1, dly->freq[isys][0]);
+                stecSigma = system->second / 1e9 * VEL_LIGHT * fq * fq / 40.28 / 1e16;
+            }
+        }
+        AtA[i * lda + i] += 1.0 / (stecSigma * stecSigma);
+    }
+}
+
 void polyModel::_estimated(map<time_t, map<string, map<int, StecC>>> &data, int nobs, int *sat2no)
 {
-    bool bcont = true;
+    constexpr int maxSolveIterations = 3;
     Deploy *dly = Controller::s_getInstance()->m_getConfigure();
-    int npms = this->m_Pm.size(), ite = 0, maxobs = nobs + m_Pm.size() + dly->nsys, nb_epoch;
+    int npms = this->m_Pm.size(), maxobs = nobs + m_Pm.size() + dly->nsys, nb_epoch;
     int (*nb2idx)[4] = (int (*)[4])calloc(maxobs * 4, sizeof(int));
     vector<double> A(npms * maxobs, 0), L(maxobs, 0), AtA(npms * npms, 0);
-    while (bcont)
+    for (int iteration = 0; iteration < maxSolveIterations; ++iteration)
     {
-        bcont = false;
         A.assign(A.size(), 0.0);
         L.assign(L.size(), 0.0);
         AtA.assign(AtA.size(), 0);
         memset(nb2idx, 0, sizeof(int) * maxobs * 4);
-        /* step 1， ADD DCB initial values */
-        _init_DCB_pam(AtA.data(), npms);
-        /* step 1, form the observation matrix */
+
+        /* DCB initial values must be available before forming L. */
+        _init_DCB_pam();
         nb_epoch = _form_A_matrix(data, A.data(), maxobs, L.data(), sat2no, nb2idx, true);
-        /* step 2, solve the equations */
-        if (m_form_norm_and_solve(nb_epoch, A.data(), maxobs, L.data(), maxobs, AtA.data(), npms))
-        {
-            /* step 3, iterate to check  */
-            vector<double> x(npms, 0);
-            int i = 0;
-            for (auto &pm : m_Pm)
-                x[i++] = pm.xcor;
-            vector<double> rs = L;
-            CMat::CMat_Matmul("NN", nb_epoch, 1, npms, 1.0, A.data(), maxobs, x.data(), npms, -1, rs.data(), maxobs); /* AX - L */
-            /* check the residuals */
-            bcont = _residual_check(data, rs.data(), nb2idx, nb_epoch) && ++ite < 3;
-            /* update sat2o, since isel is updated */
-            _update_s2o(data, sat2no);
-        }
+        if (!m_form_norm_and_solve(nb_epoch, A.data(), maxobs, L.data(), maxobs, AtA.data(), npms))
+            break;
+
+        /* The last solve is final: do not change weights without solving again. */
+        if (iteration + 1 == maxSolveIterations)
+            break;
+
+        vector<double> x(npms, 0);
+        for (size_t i = 0; i < m_Pm.size(); ++i)
+            x[i] = m_Pm[i].xcor;
+        vector<double> rs = L;
+        CMat::CMat_Matmul("NN", nb_epoch, 1, npms, 1.0, A.data(), maxobs, x.data(), npms, -1, rs.data(), maxobs); /* AX - L */
+
+        int changed = _residual_check(data, rs.data(), nb2idx, nb_epoch);
+        if (changed == 0)
+            break;
+        _update_s2o(data, sat2no);
     }
     free(nb2idx);
 }
@@ -432,13 +456,7 @@ void polyModel::_update_estimated_conf(time_t tnow, map<time_t, map<string, t_ke
     }
     // step 2, DCB parameters
     for (auto &sta : sta_list)
-    {
-        for (i = 0; i < dly->nsys; i++)
-        {
-            polypm pm = polypm(-1, dly->system[i], sta, 2, -1, -1);
-            m_Pm.push_back(pm);
-        }
-    }
+        m_Pm.push_back(polypm(-1, m_csys, sta, 2, -1, -1));
     // 更新中央经纬度
     double all_lat = 0.0, all_lon = 0.0;
     for (const auto &kv : dly->mSta)
@@ -490,14 +508,9 @@ int polyModel::_idx_pm(int isat, char csys, string ssta, int tp, int i, int j)
         if (-1 == (ista = bbo_index_vector(sta_list, ssta)))
             return -1;
 
-        int idx_start = nsat * nPs + ista * dly->nsys;
-        for (int s = 0; s < dly->nsys; ++s)
-        {
-            if (m_Pm[idx_start + s].sname == sta_list[ista] && m_Pm[idx_start + s].csys == csys)
-            {
-                return idx_start + s;
-            }
-        }
+        int idx = nsat * nPs + ista;
+        if (m_Pm[idx].sname == sta_list[ista] && m_Pm[idx].csys == csys)
+            return idx;
         return -1;
     }
     else
@@ -568,38 +581,108 @@ void polyModel::_add_single_constraint(double *AtA, int lda, const char csys)
     delete[] max_sta_num;
 }
 
-void polyModel::_assign_esigma(map<string, map<int, StecC>> &res, map<string, polyCoefficient> &coef)
+void polyModel::_assign_fit_statistics(map<string, polyCoefficient> &coef)
 {
-    map<string, double> esig;
-    map<string, int> n_esig;
+    struct t_fitstat
+    {
+        double v2 = 0.0;
+        double pv2 = 0.0;
+        int n = 0;
+    };
+
+    map<string, t_fitstat> sat2stat;
+    t_fitstat allstat;
     Deploy *dly = Controller::s_getInstance()->m_getConfigure();
-    for (auto &sit2v : res) // 测站
+
+    /* 统计当前滑动窗口中最终参与解算的观测值 */
+    for (auto &t2v : m_data)
     {
-        // const string &sname = sit2v.first;
-        for (auto &sat2v : sit2v.second)
+        for (auto &sit2v : t2v.second)
         {
-            int isat = sat2v.first;
+            const string &sname = sit2v.first;
+            for (auto &sat2v : sit2v.second)
+            {
+                StecC &s = sat2v.second;
+                if (s.isel == 0)
+                    continue;
 
-            double v = sat2v.second.ionva;
+                int isat = sat2v.first;
+                const string &prn = dly->prn_alias[isat];
+                auto icoef = coef.find(prn);
+                if (icoef == coef.end())
+                    continue;
 
-            if (esig.find(dly->prn_alias[isat]) == esig.end())
-                esig[dly->prn_alias[isat]] = 0.0;
-            esig[dly->prn_alias[isat]] += v * v; /* sat2v.second.R has already be multiply into A, L and Residual */
+                int idcb = _idx_pm(-1, prn[0], sname, 2, -1, -1);
+                if (idcb < 0)
+                    continue;
 
-            if (n_esig.find(dly->prn_alias[isat]) == n_esig.end())
-                n_esig[dly->prn_alias[isat]] = 0;
-            n_esig[dly->prn_alias[isat]] += 1;
+                double vm = icoef->second.m_getModelV(s.t_r.time,
+                                                      dly->mSta[sname].geod[0] * RAD2DEG,
+                                                      dly->mSta[sname].geod[1] * RAD2DEG);
+                double v = s.ionva - vm - m_Pm[idcb].xest;
+                double rv = s.R * v;
+
+                t_fitstat &st = sat2stat[prn];
+                st.v2 += v * v;
+                st.pv2 += rv * rv;
+                st.n++;
+
+                allstat.v2 += v * v;
+                allstat.pv2 += rv * rv;
+                allstat.n++;
+            }
         }
     }
 
-    for (auto &kv : esig)
+    int npm = 0, ndcb = 0;
+    map<string, int> sat2npm;
+    for (const auto &pm : m_Pm)
     {
-        if (coef.count(kv.first) != 0)
-        {
-            coef[kv.first].esig = sqrt(kv.second / n_esig[kv.first]);
-        }
+        if (pm.iobs == 0)
+            continue;
+        npm++;
+        if (pm.tp == 1)
+            sat2npm[dly->prn_alias[pm.isat]]++;
+        else if (pm.tp == 2)
+            ndcb++;
     }
-    return;
+
+    int dof_all = allstat.n - npm;
+    if (dof_all <= 0)
+        dof_all = allstat.n;
+
+    double fit_all = 0.0, esig_all = 0.0;
+    if (allstat.n > 0)
+    {
+        fit_all = sqrt(allstat.v2 / allstat.n);
+        esig_all = sqrt(allstat.pv2 / dof_all);
+    }
+
+    for (auto &kv : coef)
+    {
+        polyCoefficient &c = kv.second;
+        auto istat = sat2stat.find(kv.first);
+        if (istat != sat2stat.end() && istat->second.n > 0)
+        {
+            const t_fitstat &st = istat->second;
+
+            /* DCB为卫星共享参数，按各星观测数分摊自由度 */
+            double dcb_dof = allstat.n > 0 ? ndcb * static_cast<double>(st.n) / allstat.n : 0.0;
+            int ndof = static_cast<int>(st.n - sat2npm[kv.first] - dcb_dof + 0.5);
+            if (ndof <= 0)
+                ndof = st.n;
+
+            c.fit_rms = sqrt(st.v2 / st.n);
+            c.esig = sqrt(st.pv2 / ndof);
+            c.nobs = st.n;
+            c.ndof = ndof;
+        }
+
+        c.fit_rms_all = fit_all;
+        c.esig_all = esig_all;
+        c.nobs_all = allstat.n;
+        c.ndof_all = dof_all;
+    }
 }
 
 map<string, polyCoefficient> polyModel::_get_estimated_coeff()
@@ -614,6 +697,7 @@ map<string, polyCoefficient> polyModel::_get_estimated_coeff()
             continue;
 
         polyCoefficient coefi;
+        coefi.isat = isat;
         coefi.m = mM;
         coefi.n = mN;
         coefi.lon0 = mlon0;
@@ -683,21 +767,20 @@ void polyModel::_output(int mjd, double sod, map<string, map<int, StecC>> &data)
             sprintf(pname, "%s/resi_%04d%03d", dly->outdir, y, d);
             Logtrace::s_defaultlogger.m_openLog(pname);
             KvContainer::setv(string(m_tag_res_fil), pname);
+            Logtrace::s_defaultlogger.m_wtMsg("@%s # RESIDUAL columns: TYPE SITE PRN MJD SOD ELEV AZIM IPP_LAT IPP_LON RESIDUAL R ISEL\n",
+                                              pname);
         }
 
         KvContainer::setv(ttag, toString(d));
     }
 
     map<string, map<int, StecC>> res_v = _get_residual(mjd2time(mjd, sod).time, m_coef, data);
-    _assign_esigma(res_v, m_coef);
+    _assign_fit_statistics(m_coef);
 
     /* output residuals */
     string f = KvContainer::getv(m_tag_res_fil);
     if (f != "" && Logtrace::s_defaultlogger.m_lexist(f))
-    {
-        map<string, map<int, StecC>> res = _get_residual(0, m_coef, data);
-        _output_residual(mjd, sod, f, res);
-    }
+        _output_residual(mjd, sod, f, res_v);
 }
 void polyModel::_output_coeff(int mjd, double sod, string f, std::map<std::string, polyCoefficient> &coef)
 {
@@ -724,12 +807,26 @@ void polyModel::_output_coeff(int mjd, double sod, string f, std::map<std::strin
 
         Logtrace::s_defaultlogger.m_wtMsg("@%s > %s %13.9lf %13.9lf %ld %d %d %d # (lat0,lon0,t0,N,M,NSAT (TEC))\n", f.c_str(), tbuf, lat0, lon0, t0,
                                           N, M, coef.size());
+
+        map<char, bool> outputSystemStatistics;
+        for (const auto &kv : coef)
+        {
+            char system = kv.first.empty() ? '?' : kv.first[0];
+            if (outputSystemStatistics[system])
+                continue;
+            outputSystemStatistics[system] = true;
+            Logtrace::s_defaultlogger.m_wtMsg("@%s # MODEL_STAT %c FIT_RMS %10.4lf ESIG %10.4lf NOBS %d NDOF %d\n",
+                                              f.c_str(), system, kv.second.fit_rms_all, kv.second.esig_all,
+                                              kv.second.nobs_all, kv.second.ndof_all);
+        }
+        Logtrace::s_defaultlogger.m_wtMsg("@%s # SAT_STAT columns after coefficients: FIT_RMS ESIG NOBS NDOF\n", f.c_str());
         for (auto &kv : coef)
         {
             Logtrace::s_defaultlogger.m_wtMsg("@%s %s", f.c_str(), kv.first.c_str());
             for (int i = 0; i < para_num; ++i)
                 Logtrace::s_defaultlogger.m_wtMsg("@%s %20.9lf ", f.c_str(), kv.second.coef[i]);
-            Logtrace::s_defaultlogger.m_wtMsg("@%s %4.2lf ", f.c_str(), kv.second.esig);
+            Logtrace::s_defaultlogger.m_wtMsg("@%s %10.4lf %10.4lf %d %d ", f.c_str(), kv.second.fit_rms,
+                                              kv.second.esig, kv.second.nobs, kv.second.ndof);
             Logtrace::s_defaultlogger.m_wtMsg("@%s \n", f.c_str());
         }
     }
@@ -744,9 +841,9 @@ void polyModel::_output_residual(int mjd, double sod, string f, map<string, map<
         for (auto &sat2v : sit2v.second)
         {
             int isat = sat2v.first;
-            Logtrace::s_defaultlogger.m_wtMsg("@%s %5s %4s %3s  %5d %9.1lf %9.4lf %9.4lf %13.9lf %13.9lf %12.3lf %12.3lf %10d\n", f.c_str(), "ION", sname.c_str(),
+            Logtrace::s_defaultlogger.m_wtMsg("@%s %5s %4s %3s  %5d %9.1lf %9.4lf %9.4lf %13.9lf %13.9lf %12.3lf %12.6lf %4d\n", f.c_str(), "ION", sname.c_str(),
                                               dly->cprn[isat].c_str(), mjd, sod, sat2v.second.elev, sat2v.second.azim, sat2v.second.ipp_lat, sat2v.second.ipp_lon,
-                                              sat2v.second.ionva, 0.3, AMB_FIX);
+                                              sat2v.second.ionva, sat2v.second.R, sat2v.second.isel);
         }
     }
 }

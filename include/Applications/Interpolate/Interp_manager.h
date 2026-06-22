@@ -20,7 +20,6 @@ namespace iono
         void _setOutputModuleId(string id) { m_moduleid = id; }
 
         void _kriging_update_xy(map<string, vector<double>> &s2coor, double lon0, map<string, map<int, StecC>> &data, Station &);
-        map<string, map<int, StecC>> _get_residual(map<std::string, polyCoefficient> &coef, map<string, map<int, StecC>> &data);
 
     protected:
         void _output(int mjd, double sod, map<string, t_gridV> &grid_v, vector<Station> &grids, map<string, map<int, StecC>> &);

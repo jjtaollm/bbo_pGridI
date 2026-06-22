@@ -36,6 +36,8 @@ void Interp_kriging_smp::_kriging_single_p(time_t t, int isat,     /* processed 
         if (pts.size() < 4)
             return;
         t_VariogramM m = _kriging_est_hyperpam(pts, 'S');
+        if (!m.b_isok)
+            return;
         /* kriging interpolate */
         map<string, t_Sunit> grid_v = _kriging_interp_onesat(t, isat, reqs, pts, m); /* iq --> satellites */
         for (auto &kv : grid_v)
@@ -63,6 +65,8 @@ void Interp_kriging_smp::_interp_r_one(int isat, int *refsat, vector<string> &sn
     if (pts.size() < 4)
         return;
     t_VariogramM m = _kriging_est_hyperpam(pts, 'S');
+    if (!m.b_isok)
+        return;
     map<int, double> pt2v = _kriging_get_gridresidual(pts, m); /* sta -> v */
     {
         std::lock_guard<std::mutex> lock(_mtx);
@@ -418,7 +422,8 @@ map<string, t_Sunit> Interp_kriging_smp::_kriging_interp_onesat(time_t t, int is
                     sum = sum + L[iq * (nd + 1) + i] * C[iq * (nd + 1) + i];
                 }
                 // LOGPRINT("sum is %9.3lf %9.3lf", sum, C[iq * (nd + 1) + nd]);
-                sum = sum - C[iq * (nd + 1) + nd];
+                // sum = sum - C[iq * (nd + 1) + nd];
+                sum = sum + C[iq * (nd + 1) + nd];
                 pv.vsign = sqrt(sum);
             }
             v_r[grids[iq].name] = pv;

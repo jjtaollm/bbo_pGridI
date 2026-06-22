@@ -144,58 +144,6 @@ static map<string, vector<double>> s_getStationC(map<string, map<int, StecC>> &d
     return s2coor;
 }
 
-map<string, map<int, StecC>> Interp_manager::_get_residual(map<std::string, polyCoefficient> &coef, map<string, map<int, StecC>> &data)
-{
-    int i, j;
-    map<string, map<int, StecC>> res;
-    Deploy *dly = Controller::s_getInstance()->m_getConfigure();
-    for (auto &sit2v : data) // 测站
-    {
-        const string &sname = sit2v.first;
-        double geod[3] = {0};
-        for (auto &sat2v : sit2v.second)
-        {
-            int isat = sat2v.first;
-            if (coef.count(dly->prn_alias[isat]) == 0)
-                continue;
-            polyCoefficient &c = coef.at(dly->prn_alias[isat]);
-            if (!sit2v.second.count(c.irf))
-                continue;
-
-            if (geod[0] * geod[1] == 0.0)
-                xyzblh(sat2v.second.x, 1.0, 0.0, 0.0, 0.0, 0.0, 0.0, geod);
-
-            double v = sat2v.second.ionva - sit2v.second[c.irf].ionva;
-            double v_model = c.m_getModelV(sat2v.second.t_r.time, geod[0] * RAD2DEG, geod[1] * RAD2DEG);
-            v = v - v_model;
-
-            if (res.count(sname) == 0)
-                res[sname] = map<int, StecC>();
-            res[sname][isat] = sat2v.second;
-            res[sname][isat].ionva = v;
-            res[sname][isat].ionvm = v_model;
-            res[sname][c.irf] = sit2v.second[c.irf];
-            res[sname][c.irf].ionva = 0.001;
-            res[sname][c.irf].ionvm = 0.001;
-
-            memcpy(res[sname][isat].x, sat2v.second.x, sizeof(double) * 3);
-            memcpy(res[sname][c.irf].x, sat2v.second.x, sizeof(double) * 3);
-        }
-    }
-    return res;
-}
-static vector<int> s_get_refbycoef(map<string, polyCoefficient> &coeff)
-{
-    vector<int> ref(MAXSYS, -1);
-    Deploy *dly = Controller::s_getInstance()->m_getConfigure();
-    for (auto &kv : coeff)
-    {
-        int isys = index_string(SYS, dly->prn_alias[kv.second.isat][0]);
-        if (ref[isys] == -1)
-            ref[isys] = kv.second.irf;
-    }
-    return ref;
-}
 /// @brief 统一坐标到平面坐标系
 /// @param lon0 中央经度，单位为度
 /// @param data 非差电离层
@@ -213,21 +161,11 @@ void Interp_manager::_kriging_update_xy(map<string, vector<double>> &s2coor, dou
     }
     bl2Gaussxy(sta.geod[0], sta.geod[1], sta.gausx, sta.gausx + 1, lon0 * D2R, ESQUARE, EARTH_A, 0.0);
 }
-void Interp_manager::_interp(int mjd, double sod, bool buse_residual, map<string, map<int, StecC>> &data, map<string, map<int, StecC>> &realv)
+void Interp_manager::_interp(int mjd, double sod, bool buse_residual, map<string, map<int, StecC>> &input, map<string, map<int, StecC>> &realv)
 {
     map<string, t_gridV> s2grid;
     map<string, vector<double>> s2cor = s_getStationC(data);
     vector<int> ref;
-    map<string, map<int, StecC>> input;
-    if (buse_residual)
-    {
-        /* using the coefficient to compute residual */
-        input = _get_residual(m_coef, data);
-        /* update ref */
-        ref = s_get_refbycoef(m_coef);
-    }
-    else
-        input = data;
     for (auto &req : mReqs)
     {
         map<string, map<int, StecC>> comm = s_getCommSite(s2cor, input, req);
@@ -300,10 +238,6 @@ void Interp_manager::_output(int mjd, double sod, map<string, t_gridV> &grid_v, 
     {
         _output_grids(mjd, sod, f, grid_v, grids, realv);
     }
-
-    {
-        _output_redis(mjd, sod, grid_v, grids);
-    }
 }
 void Interp_manager::_output_grids(int mjd, double sod, string f, map<string, t_gridV> &grid_v, vector<Station> &grids, map<string, map<int, StecC>> &reald)
 {
@@ -361,165 +295,5 @@ void Interp_manager::_output_grids(int mjd, double sod, string f, map<string, t_
                                                   0.0, 0.001, AMB_FIX, 0.001, 0.001, sat2v.second.nobs, sat2v.second.aveDist);
             }
         }
-    }
-}
-
-/// @brief output coeff/grid information into redis
-/// @param mjd
-/// @param sod
-/// @param grid_v
-/// @param grids
-void Interp_manager::_output_redis(int mjd, double sod, map<string, t_gridV> &grid_v, vector<Station> &grids)
-{
-    Deploy *dly = Controller::s_getInstance()->m_getConfigure();
-    function _get_sta_idx = [](vector<Station> &grids, const string &sta) -> int
-    {
-        for (size_t i = 0; i < grids.size(); ++i)
-            if (sta == grids[i].name)
-                return i;
-        return -1;
-    };
-    if (m_url_send != "" && !m_sender.b_ison())
-    {
-        char buff[1024];
-        char command[2048];
-        char addr[256] = {0}, port_str[256] = {0};
-        decodetcppath(m_url_send.c_str(), addr, port_str, NULL, NULL, NULL, NULL);
-        // 找到最后一个 '/'
-        size_t pos = m_url_send.find_last_of('/');
-        std::string mnt = (pos == std::string::npos) ? m_url_send : m_url_send.substr(pos + 1);
-
-        m_sender.m_setRedisConfigure(addr, atoi(port_str), "");
-        m_sender.m_StartService();
-    }
-    size_t pos = m_url_send.find_last_of('/');
-    std::string mnt = (pos == std::string::npos) ? m_url_send : m_url_send.substr(pos + 1);
-    for (auto &kv : grid_v)
-    {
-        int idx = -1;
-        Json::Value root;
-        char buff[1024] = {0};
-        vector<int> irf(MAXSYS, -1), maxobs(MAXSYS, 0);
-        if (-1 == (idx = _get_sta_idx(grids, kv.first)))
-            continue;
-        for (auto &[isat, data] : kv.second.gridv)
-        {
-            Json::Value sate;
-            double surf = 0.0;
-            string &cprn = dly->prn_alias[isat];
-            if (m_coef.count(cprn))
-                surf = m_coef[cprn].m_getModelV(mjd2time(mjd, sod).time, grids[idx].geod[0] * RAD2DEG, grids[idx].geod[1] * RAD2DEG);
-
-            int isys = index_string(SYS, dly->prn_alias[isat][0]);
-            irf[isys] = kv.second.refsat[isys];
-            sate["cprn"] = dly->cprn[isat];
-            sate["ion"] = toString(data.v + surf);
-            sate["sig"] = toString(data.vsign);
-            sate["nobs"] = toString(data.nobs);
-
-            if (data.nobs > maxobs[isys])
-                maxobs[isys] = data.nobs;
-            root["satellite"].append(sate);
-        }
-
-        for (int isys = 0; isys < MAXSYS; ++isys)
-        {
-            if (irf[isys] == -1)
-                continue;
-            Json::Value sate;
-            sate["cprn"] = dly->cprn[irf[isys]];
-            sate["ion"] = toString(0.0);
-            sate["sig"] = toString(0.001);
-            sate["nobs"] = toString(maxobs[isys]);
-            root["satellite"].append(sate);
-        }
-        if (root["satellite"].size() > 0)
-        {
-            root["time"] = run_timefmt(mjd, sod, buff);
-            Package pack_am;
-            pack_am.expire = -1;
-            pack_am.type = "SET";
-            pack_am.channel = mnt + ":ion:" + kv.first;
-            pack_am.ptime = mjd2time(mjd, sod).time;
-            string str = zipJson(root.toStyledString());
-            pack_am.buff = (char *)calloc(sizeof(char), str.size());
-            memcpy(pack_am.buff, str.c_str(), sizeof(char) * str.size());
-            pack_am.nbyte = str.size();
-            m_sender.m_addPackage(pack_am, "grid_ion");
-        }
-    }
-    /* output coefficient */
-    time_t t0;
-    double lat0;
-    double lon0;
-    int N = 0, M = 0;
-    for (auto &kv : m_coef)
-    {
-        N = kv.second.n;
-        M = kv.second.m;
-        lat0 = kv.second.lat0;
-        lon0 = kv.second.lon0;
-        t0 = kv.second.t0;
-    }
-    int nums = m_coef.size();
-    int para_num = (N + 1) * (M + 1);
-
-    if (nums > 0 && m_moduleid != "")
-    {
-        Json::Value root;
-        vector<int> irf(MAXSYS, -1);
-        char strv[1024] = {0};
-        for (auto &kv : m_coef)
-        {
-            Json::Value sate;
-            char buff[4096] = {0};
-            int isys = index_string(SYS, dly->prn_alias[kv.second.isat][0]);
-            irf[isys] = kv.second.irf;
-
-            for (int i = 0; i < para_num; ++i)
-                sprintf(buff + strlen(buff), " %15.10lf ", kv.second.coef[i]);
-            sate["coef"] = toString(buff);
-            sate["cprn"] = dly->cprn[kv.second.isat];
-            sate["sig-f"] = toString(kv.second.esig);
-            sate["sig-c"] = toString(kv.second.esig_cv);
-            sate["nobs"] = toString(kv.second.nobs);
-
-            root["satellite"].append(sate);
-        }
-        for (int isys = 0; isys < MAXSYS; ++isys)
-        {
-            if (irf[isys] == -1)
-                continue;
-            Json::Value sate;
-            char buff[4096] = {0};
-            for (int i = 0; i < para_num; ++i)
-                sprintf(buff + strlen(buff), " %20.9lf ", 0.0);
-            sate["coef"] = toString(buff);
-            sate["cprn"] = dly->cprn[irf[isys]];
-
-            sate["sig-f"] = toString(0.001);
-            sate["sig-c"] = toString(0.001);
-            root["satellite"].append(sate);
-        }
-        root["N"] = toString(N);
-        root["M"] = toString(M);
-        sprintf(strv, "%20.9lf", lat0);
-        root["lat0"] = toString(strv);
-        sprintf(strv, "%20.9lf", lon0);
-        root["lon0"] = toString(strv);
-        sprintf(strv, "%ld", t0);
-        root["t0"] = toString(strv);
-
-        root["time"] = run_timefmt(mjd, sod, strv);
-        Package pack_am;
-        pack_am.expire = -1;
-        pack_am.type = "SET";
-        pack_am.channel = mnt + ":" + m_moduleid;
-        pack_am.ptime = mjd2time(mjd, sod).time;
-        string str = root.toStyledString();
-        pack_am.buff = (char *)calloc(sizeof(char), str.size());
-        memcpy(pack_am.buff, str.c_str(), sizeof(char) * str.size());
-        pack_am.nbyte = str.size();
-        m_sender.m_addPackage(pack_am, "POLY_ion");
     }
 }

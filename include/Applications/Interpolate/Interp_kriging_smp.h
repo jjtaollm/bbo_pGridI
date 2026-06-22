@@ -11,7 +11,7 @@ namespace iono
     public:
         bool b_isok = 0;
         double nugget = 0.0; // NUGGET
-        double sill = 0.0;   // SILL (C0+C)
+        double sill = 0.0;   // PARTIAL SILL; total sill is nugget+sill
         double range = 0.0;  // RANGE (Max distance to consider v(a)=SILL)
         char TYPE = 'S';     // Type of variogram to use, S sepheric, G gaussian,E exponential, L linear
     };

@@ -14,16 +14,10 @@ using namespace iono;
 Controller *Controller::sInstance = NULL;
 Controller::Controller()
 {
-    mdebugSd = NULL;
-    mDcbGenerator = NULL;
     mInterp = NULL;
 }
 Controller::~Controller()
 {
-    if (mdebugSd)
-        delete mdebugSd;
-    if (mDcbGenerator)
-        delete mDcbGenerator;
     if (mInterp)
         delete mInterp;
     for (auto &[_, v] : mPolyModel)
@@ -56,7 +50,6 @@ void Controller::m_makeUpReaders()
 }
 void Controller::m_makeUpdFilter()
 {
-
     if (strstr(mDly.m_mode, "POLY"))
     {
         for (int isys = 0; isys < mDly.nsys; ++isys)
@@ -103,7 +96,6 @@ void Controller::m_splitEpochData(EpochData &epoch)
             epoch.verify[station] = observations;
     }
 }
-
 Controller::EpochData Controller::m_readEpoch(bool reopenInputs)
 {
     m_initInputs(mDly.mjd, mDly.sod, reopenInputs);

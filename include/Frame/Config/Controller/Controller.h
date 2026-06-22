@@ -53,9 +53,6 @@ namespace iono
         UDAtomAdapter mionAdapter;
         PManager mManger;
         map<string, UDAtomReader *> mionReaders; /* in post mode, each station has a reader, * in realtime, each connection has a reader */
-        RedisSender *mionoSd = NULL;             /* sending ionosphere */
-        RedisSender *mdebugSd = NULL;            /* sending debug information,as ionosphere data*/
-        bboDCB *mDcbGenerator;
         map<char, polyModel *> mPolyModel;
         Interp_manager *mInterp;
 
