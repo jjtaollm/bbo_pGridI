@@ -17,6 +17,47 @@
 #include <algorithm>
 using namespace std;
 using namespace iono;
+
+namespace
+{
+enum class BdsPhase
+{
+    BEFORE_UPDATE,
+    AFTER_UPDATE
+};
+
+BdsPhase get_bds_phase(const char *addargs)
+{
+    const char *arg = strstr(addargs, "-bdsphase=");
+    if (arg == NULL)
+        return BdsPhase::BEFORE_UPDATE;
+
+    char phase[16] = {0};
+    if (sscanf(arg, "-bdsphase=%15s", phase) == 1)
+    {
+        if (!strcmp(phase, "before"))
+            return BdsPhase::BEFORE_UPDATE;
+        if (!strcmp(phase, "after"))
+            return BdsPhase::AFTER_UPDATE;
+    }
+
+    cerr << "invalid -bdsphase, use before or after" << endl;
+    exit(1);
+}
+
+bool is_bds2(const char *prn, BdsPhase phase)
+{
+    if (prn[0] != 'C')
+        return false;
+
+    const int iprn = atoi(prn + 1);
+    if (phase == BdsPhase::AFTER_UPDATE)
+        return iprn == 9 || iprn == 10;
+
+    return iprn < 19;
+}
+} // namespace
+
 Deploy::Deploy()
 {
     tracelevel = 0;
@@ -38,6 +79,7 @@ Deploy::Deploy()
     memset(freq, 0, sizeof(freq));
     memset(dcbfile, 0, sizeof(dcbfile));
     memset(nfreq, 0, sizeof(nfreq));
+    memset(m_addargs, 0, sizeof(m_addargs));
     strcpy(this->outdir, "./");
 }
 Deploy::~Deploy()
@@ -46,8 +88,8 @@ Deploy::~Deploy()
 void Deploy::m_printUsage()
 {
     cout << "GNSS ionosphere real-time & post data process program@jtaowhu" << endl;
-    cout << "     usage : [POST MODE] iono -mode POL_SD+INTERP/POL_SD/INTERP files.json -pams -outpoly[=10] -outgrid[=10] -outpolyres -skipR (do not contain request input)" << endl;
-    cout << "     usage : [Rt   MODE] iono -mode POL_SD+INTERP/POL_SD/INTERP -intv 5 -url $url -pams -outpoly[=10] -outgrid[=10] " << endl;
+    cout << "     usage : [POST MODE] iono -mode POL_SD+INTERP/POL_SD/INTERP files.json -pams -bdsphase=before/after -outpoly[=10] -outgrid[=10] -outpolyres -skipR (do not contain request input)" << endl;
+    cout << "     usage : [Rt   MODE] iono -mode POL_SD+INTERP/POL_SD/INTERP -intv 5 -url $url -pams -bdsphase=before/after -outpoly[=10] -outgrid[=10] " << endl;
     cout << "Compiled on: " << __DATE__ << " at " << __TIME__ << std::endl;
     cout << "Contact: jtaowhu@whu.edu.cn" << endl;
     exit(1);
@@ -55,6 +97,7 @@ void Deploy::m_printUsage()
 void Deploy::m_parse_config(string config)
 {
     int nprn = 0;
+    const BdsPhase bds_phase = get_bds_phase(m_addargs);
     char line[1024] = {0}, prn[8] = {0}, _prn_alias[8] = {0}, sitn[8] = {0};
     FILE *fp = NULL;
     if (!(fp = fopen(config.c_str(), "r")))
@@ -83,7 +126,7 @@ void Deploy::m_parse_config(string config)
                 continue;
             }
             strcpy(_prn_alias, prn);
-            if (prn[0] == 'C' && atoi(prn + 1) < 19)
+            if (is_bds2(prn, bds_phase))
                 _prn_alias[0] = 'B';
             cprn[nprn] = string(prn);
             prn_alias[nprn] = string(_prn_alias);
@@ -382,6 +425,7 @@ void Deploy::m_assign_default(int argc, char *args[])
     if (strstr(m_addargs, "-outpoly="))
         sscanf(strstr(m_addargs, "-outpoly="), "-outpoly=%d", &this->t_opoly_intv);
 
+    const BdsPhase bds_phase = get_bds_phase(m_addargs);
     int isys;
     char prn[8] = {0};
 
@@ -405,7 +449,8 @@ void Deploy::m_assign_default(int argc, char *args[])
     {
         sprintf(prn, "C%02d", i + 1);
         this->cprn[nprn] = prn;
-        sprintf(prn, "B%02d", i + 1);
+        if (is_bds2(prn, bds_phase))
+            prn[0] = 'B';
         this->prn_alias[nprn] = prn;
 
         Satellite sat;
