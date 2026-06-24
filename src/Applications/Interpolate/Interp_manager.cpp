@@ -249,7 +249,7 @@ void Interp_manager::_output_grids(int mjd, double sod, string f, map<string, t_
         return -1;
     };
 
-    int i, ref_o[MAXSYS] = {0}, idx;
+    int ref_o[MAXSYS] = {0}, idx;
     time_t t = mjd2time(mjd, sod).time;
     Deploy *dly = Controller::s_getInstance()->m_getConfigure();
 
@@ -264,18 +264,23 @@ void Interp_manager::_output_grids(int mjd, double sod, string f, map<string, t_
         for (auto &sat2v : sit2v.gridv)
         {
             int isat = sat2v.first, isys = index_string(SYS, dly->prn_alias[isat][0]), irf = sit2v.refsat[isys];
+            if (irf == -1)
+                continue;
+
             /* compute the surface value */
             double surf = 0.0, surf_r = 0.0;
             string &cprn = dly->prn_alias[isat], &cprn_r = dly->prn_alias[irf];
             if (m_coef.count(cprn))
                 surf = m_coef[cprn].m_getModelV(t, grids[idx].geod[0] * RAD2DEG, grids[idx].geod[1] * RAD2DEG);
+            if (m_coef.count(cprn_r))
+                surf_r = m_coef[cprn_r].m_getModelV(t, grids[idx].geod[0] * RAD2DEG, grids[idx].geod[1] * RAD2DEG);
 
             double real_dif = 999;
             double elev = 0.0, azim = 0.0, relev = 0.0, razim = 0.0;
             if (reald.count(sname) && reald[sname].count(isat) && reald[sname].count(irf))
             {
                 double rdata = reald[sname][isat].ionva, rdata_ref = reald[sname][irf].ionva;
-                real_dif = rdata - rdata_ref - sat2v.second.v - surf;
+                real_dif = rdata - rdata_ref - sat2v.second.v - (surf - surf_r);
 
                 elev = reald[sname].at(isat).elev;
                 azim = reald[sname].at(isat).azim;
@@ -287,12 +292,12 @@ void Interp_manager::_output_grids(int mjd, double sod, string f, map<string, t_
             Logtrace::s_defaultlogger.m_wtMsg("@%s %5s %4s %3s  %5d %9.1lf %9.4lf %9.4lf %12.3lf %12.3lf %10d %12.3lf %12.3lf %03d %9.3lf\n", f.c_str(), "ION", sname.c_str(),
                                               dly->cprn[isat].c_str(), mjd, sod, elev, azim,
                                               sat2v.second.v + surf, sat2v.second.vsign, AMB_FIX, sat2v.second.vsig, real_dif, sat2v.second.nobs, sat2v.second.aveDist);
-            if (!ref_o[isys] && irf != -1)
+            if (!ref_o[isys])
             {
                 ref_o[isys] = true;
                 Logtrace::s_defaultlogger.m_wtMsg("@%s %5s %4s %3s  %5d %9.1lf %9.4lf %9.4lf %12.3lf %12.3lf %10d %12.3lf %12.3lf %03d %9.3lf\n", f.c_str(), "ION", sname.c_str(),
                                                   dly->cprn[irf].c_str(), mjd, sod, relev, razim,
-                                                  0.0, 0.001, AMB_FIX, 0.001, 0.001, sat2v.second.nobs, sat2v.second.aveDist);
+                                                  surf_r, 0.001, AMB_FIX, 0.001, 0.0, sat2v.second.nobs, sat2v.second.aveDist);
             }
         }
     }
