@@ -192,19 +192,21 @@ map<string, pair<double, double>> Interp_manager::_get_gridv(int mjd, double sod
     for (auto &kv : sat2v)
     {
         int isat = kv.first, isys = index_string(SYS, dly->prn_alias[isat][0]);
+        int irf = refsat[isys];
+        if (irf == -1)
+            continue;
         /* compute the surface value */
         double surf = 0.0, surf_r = 0.0;
-        string &cprn = dly->prn_alias[isat], &cprn_r = dly->prn_alias[refsat[isys]];
-        if (m_coef.count(cprn) && m_coef.count(cprn_r))
-        {
+        string &cprn = dly->prn_alias[isat], &cprn_r = dly->prn_alias[irf];
+        if (m_coef.count(cprn))
             surf = m_coef[cprn].m_getModelV(t, grid.geod[0] * RAD2DEG, grid.geod[1] * RAD2DEG);
+        if (m_coef.count(cprn_r))
             surf_r = m_coef[cprn_r].m_getModelV(t, grid.geod[0] * RAD2DEG, grid.geod[1] * RAD2DEG);
-        }
         m_r[dly->prn_alias[isat]] = make_pair(kv.second.v + surf - surf_r, kv.second.vsig);
-        if (!ref_o[isys] && refsat[isys] != -1)
+        if (!ref_o[isys])
         {
             ref_o[isys] = true;
-            m_r[dly->prn_alias[refsat[isys]]] = make_pair(0.0, 0.001);
+            m_r[dly->prn_alias[irf]] = make_pair(surf_r, 0.001);
         }
     }
 
