@@ -1,0 +1,4 @@
+#cmakedefine USE_PARALLEL_MKL
+#cmakedefine USE_SEQ_MKL
+#cmakedefine USE_REDIS
+#cmakedefine USE_MQTT

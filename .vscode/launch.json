@@ -47,6 +47,50 @@
                 }
             ],
             "preLaunchTask": "release iono"
+        },
+        {
+            "name": "DSTEC",
+            "type": "cppdbg",
+            "request": "launch",
+            "program": "${workspaceFolder}/iono",
+            "args": [
+                "-mode",
+                "DSTEC",
+                "files.json",
+                "-post",
+                "-pams",
+                "-bdsphase=after",
+                "-outgrid"
+            ],
+            "stopAtEntry": false,
+            "cwd": "/home/jtao/company/dev/IonGProject/bbo_pGridI/Configures/Network_grid",
+            "environment": [],
+            "externalConsole": false,
+            "MIMode": "gdb",
+            "miDebuggerPath": "/usr/bin/gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-interpreter-exec console \"python import sys; sys.path.insert(0, '/usr/share/gcc/python'); from libstdcxx.v6.printers import register_libstdcxx_printers; register_libstdcxx_printers(None)\"",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Print object dynamic type",
+                    "text": "-interpreter-exec console \"set print object on\"",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Print array elements",
+                    "text": "-interpreter-exec console \"set print elements 0\"",
+                    "ignoreFailures": true
+                }
+            ],
+            "preLaunchTask": "release iono"
         }
     ]
 }

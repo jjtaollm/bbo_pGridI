@@ -178,6 +178,12 @@ void Controller::startup_GnssProcess(bool b_post)
         mDly.mjd = mDly.mjd0;
         mDly.sod = mDly.sod0;
     }
+    if (strstr(mDly.m_mode, "DSTEC"))
+    {
+        bbo_dstec stec;
+        stec.m_process();
+        return;
+    }
     int mjdSync = -1;
     while (true)
     {

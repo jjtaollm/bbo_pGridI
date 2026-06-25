@@ -1,5 +1,8 @@
 build*
-bbo*
 iono
 Configures
 *.md
+!include/Applications/dStec
+sitlist*
+scripts/
+Scripts/

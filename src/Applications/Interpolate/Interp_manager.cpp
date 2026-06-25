@@ -184,7 +184,7 @@ void Interp_manager::_interp(int mjd, double sod, map<string, map<int, StecC>> &
 
 map<string, pair<double, double>> Interp_manager::_get_gridv(int mjd, double sod, int *refsat, map<int, t_Sunit> &sat2v, Station &grid)
 {
-    int idx = -1, ref_o[MAXSYS] = {0};
+    int ref_o[MAXSYS] = {0};
     time_t t = mjd2time(mjd, sod).time;
     Deploy *dly = Controller::s_getInstance()->m_getConfigure();
     memset(ref_o, 0, sizeof(ref_o));
@@ -206,7 +206,7 @@ map<string, pair<double, double>> Interp_manager::_get_gridv(int mjd, double sod
         if (!ref_o[isys])
         {
             ref_o[isys] = true;
-            m_r[dly->prn_alias[irf]] = make_pair(surf_r, 0.001);
+            m_r[dly->prn_alias[irf]] = make_pair(0.0, 0.001);
         }
     }
 
@@ -293,13 +293,13 @@ void Interp_manager::_output_grids(int mjd, double sod, string f, map<string, t_
 
             Logtrace::s_defaultlogger.m_wtMsg("@%s %5s %4s %3s  %5d %9.1lf %9.4lf %9.4lf %12.3lf %12.3lf %10d %12.3lf %12.3lf %03d %9.3lf\n", f.c_str(), "ION", sname.c_str(),
                                               dly->cprn[isat].c_str(), mjd, sod, elev, azim,
-                                              sat2v.second.v + surf, sat2v.second.vsign, AMB_FIX, sat2v.second.vsig, real_dif, sat2v.second.nobs, sat2v.second.aveDist);
+                                              sat2v.second.v + surf - surf_r, sat2v.second.vsign, AMB_FIX, sat2v.second.vsig, real_dif, sat2v.second.nobs, sat2v.second.aveDist);
             if (!ref_o[isys])
             {
                 ref_o[isys] = true;
                 Logtrace::s_defaultlogger.m_wtMsg("@%s %5s %4s %3s  %5d %9.1lf %9.4lf %9.4lf %12.3lf %12.3lf %10d %12.3lf %12.3lf %03d %9.3lf\n", f.c_str(), "ION", sname.c_str(),
                                                   dly->cprn[irf].c_str(), mjd, sod, relev, razim,
-                                                  surf_r, 0.001, AMB_FIX, 0.001, 0.0, sat2v.second.nobs, sat2v.second.aveDist);
+                                                  0.0, 0.001, AMB_FIX, 0.001, 0.0, sat2v.second.nobs, sat2v.second.aveDist);
             }
         }
     }

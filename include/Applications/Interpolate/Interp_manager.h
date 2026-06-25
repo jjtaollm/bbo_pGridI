@@ -34,8 +34,6 @@ namespace iono
         ThreadPool *_pool;
         RedisSender m_sender;
         map<string, Interp_kriging_smp *> rq2krig;
-        map<time_t, map<int, map<string, double>>> m_r_win_grids; /* residual windows, time_t,isat,site,sig */
-        map<time_t, map<int, map<string, double>>> m_r_win_coef;  /* residual windows, time_t,isat,site,sig */
     };
 }
 #endif

@@ -1,6 +1,7 @@
 #include "include/Applications/SurfaceModel/polyModel.h"
 #include "include/Applications/Interpolate/Interp_kriging_smp.h"
 #include "include/Applications/Interpolate/Interp_manager.h"
+#include "include/Applications/dStec/bbo_dstec.h"
 // /* debug end */
 namespace iono
 {
